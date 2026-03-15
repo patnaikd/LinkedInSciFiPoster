@@ -1,0 +1,332 @@
+import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import {
+  PenTool,
+  Sparkles,
+  Save,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  BookOpen,
+  Film,
+  Loader2,
+  FileText,
+  MessageSquare,
+  ExternalLink,
+} from 'lucide-react';
+import {
+  getPost,
+  getResearchItems,
+  generatePost,
+  updatePost,
+} from '../services/api';
+
+const TONE_OPTIONS = [
+  { value: 'professional_witty', label: 'Professional & Witty' },
+  { value: 'thought_leadership', label: 'Thought Leadership' },
+  { value: 'casual_fun', label: 'Casual & Fun' },
+  { value: 'provocative', label: 'Provocative' },
+  { value: 'storytelling', label: 'Storytelling' },
+];
+
+export default function AuthoringPage() {
+  const { postId } = useParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [tone, setTone] = useState('professional_witty');
+  const [content, setContent] = useState('');
+  const [additionalInstructions, setAdditionalInstructions] = useState('');
+  const [contentLoaded, setContentLoaded] = useState(false);
+
+  const { data: post, isLoading: postLoading } = useQuery({
+    queryKey: ['post', postId],
+    queryFn: () => getPost(postId),
+    onSuccess: (data) => {
+      if (!contentLoaded) {
+        if (data.content) setContent(data.content);
+        if (data.tone) setTone(data.tone);
+        setContentLoaded(true);
+      }
+    },
+  });
+
+  // Handle initial data load via effect-like pattern
+  if (post && !contentLoaded) {
+    if (post.content) setContent(post.content);
+    if (post.tone) setTone(post.tone);
+    setContentLoaded(true);
+  }
+
+  const { data: researchItems = [] } = useQuery({
+    queryKey: ['research', postId],
+    queryFn: () => getResearchItems(postId),
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: generatePost,
+    onSuccess: (data) => {
+      const generatedContent = data.content || data.generated_content || '';
+      setContent(generatedContent);
+      queryClient.invalidateQueries({ queryKey: ['post', postId] });
+      toast.success('Post generated successfully');
+    },
+    onError: (err) => toast.error(err.message || 'Generation failed'),
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: ({ id, data }) => updatePost(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['post', postId] });
+      toast.success('Draft saved');
+    },
+    onError: (err) => toast.error(err.message || 'Failed to save'),
+  });
+
+  const handleGenerate = () => {
+    generateMutation.mutate({
+      post_id: parseInt(postId),
+      tone,
+      additional_instructions: additionalInstructions || undefined,
+    });
+  };
+
+  const handleSaveDraft = () => {
+    saveMutation.mutate({
+      id: postId,
+      data: { content, tone },
+    });
+  };
+
+  const handleContinue = () => {
+    saveMutation.mutate(
+      { id: postId, data: { content, tone } },
+      { onSuccess: () => navigate(`/publish/${postId}`) }
+    );
+  };
+
+  const parseThemes = (themes) => {
+    if (Array.isArray(themes)) return themes;
+    try {
+      return JSON.parse(themes);
+    } catch {
+      return [];
+    }
+  };
+
+  const sciFiItem = post?.sci_fi_item;
+  const themes = sciFiItem ? parseThemes(sciFiItem.themes) : [];
+
+  if (postLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-slate-200 flex">
+      {/* Collapsible Sidebar */}
+      <div
+        className={`transition-all duration-300 flex-shrink-0 ${
+          sidebarOpen ? 'w-80' : 'w-0'
+        } overflow-hidden`}
+      >
+        <div className="w-80 h-full bg-slate-800 border-r border-slate-700 p-6 overflow-y-auto">
+          {/* Sci-Fi Item Info */}
+          {sciFiItem && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                {sciFiItem.item_type === 'book' ? (
+                  <BookOpen className="w-5 h-5 text-cyan-400" />
+                ) : (
+                  <Film className="w-5 h-5 text-cyan-400" />
+                )}
+                Source Material
+              </h3>
+              {sciFiItem.cover_image_url && (
+                <img
+                  src={sciFiItem.cover_image_url}
+                  alt={sciFiItem.title}
+                  className="w-full h-48 object-cover rounded-lg mb-3"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              )}
+              <h4 className="text-white font-medium">{sciFiItem.title}</h4>
+              <p className="text-slate-400 text-sm">
+                {sciFiItem.author_or_director}
+                {sciFiItem.year ? ` (${sciFiItem.year})` : ''}
+              </p>
+              {themes.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {themes.map((theme, i) => (
+                    <span
+                      key={i}
+                      className="bg-cyan-500/10 text-cyan-400 text-xs px-2 py-0.5 rounded-full border border-cyan-500/20"
+                    >
+                      {theme}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Research Items */}
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-cyan-400" />
+              Research ({researchItems.length})
+            </h3>
+            {researchItems.length === 0 ? (
+              <p className="text-slate-500 text-sm">No research items added.</p>
+            ) : (
+              <div className="space-y-2">
+                {researchItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="bg-slate-900/50 rounded-lg border border-slate-700 p-3"
+                  >
+                    <h5 className="text-white text-sm font-medium truncate">{item.title}</h5>
+                    {item.snippet && (
+                      <p className="text-slate-400 text-xs mt-1 line-clamp-2">{item.snippet}</p>
+                    )}
+                    {item.url && (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-cyan-400 text-xs hover:underline flex items-center gap-1 mt-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Source
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Sidebar Toggle */}
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className="flex-shrink-0 w-6 bg-slate-800 border-r border-slate-700 flex items-center justify-center hover:bg-slate-700 transition-colors"
+      >
+        {sidebarOpen ? (
+          <ChevronLeft className="w-4 h-4 text-slate-400" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-slate-400" />
+        )}
+      </button>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="max-w-4xl mx-auto w-full px-6 py-8 flex flex-col flex-1">
+          <div className="flex items-center gap-3 mb-6">
+            <PenTool className="w-8 h-8 text-cyan-400" />
+            <h1 className="text-3xl font-bold text-white">Authoring</h1>
+          </div>
+
+          {/* Top Bar - Tone & Generate */}
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-4 mb-6">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-slate-400 text-sm font-medium">Tone:</label>
+                <select
+                  value={tone}
+                  onChange={(e) => setTone(e.target.value)}
+                  className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-sm"
+                >
+                  {TONE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <input
+                  type="text"
+                  value={additionalInstructions}
+                  onChange={(e) => setAdditionalInstructions(e.target.value)}
+                  placeholder="Additional instructions (optional)"
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-sm"
+                />
+              </div>
+              <button
+                onClick={handleGenerate}
+                disabled={generateMutation.isPending}
+                className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-5 py-2 rounded-lg font-medium transition-colors"
+              >
+                {generateMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                {generateMutation.isPending ? 'Generating...' : 'Generate with AI'}
+              </button>
+            </div>
+          </div>
+
+          {/* Content Textarea */}
+          <div className="flex-1 flex flex-col mb-6">
+            <div className="bg-slate-800 rounded-xl border border-slate-700 flex-1 flex flex-col">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-cyan-400" />
+                  <span className="text-slate-300 text-sm font-medium">Post Content</span>
+                </div>
+                <span
+                  className={`text-sm ${
+                    content.length > 3000 ? 'text-red-400' : 'text-slate-500'
+                  }`}
+                >
+                  {content.length} / 3,000
+                </span>
+              </div>
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Your LinkedIn post content will appear here after generation, or you can start writing..."
+                className="flex-1 min-h-[400px] bg-transparent px-4 py-4 text-slate-200 placeholder-slate-500 focus:outline-none resize-none text-base leading-relaxed"
+              />
+            </div>
+          </div>
+
+          {/* Bottom Actions */}
+          <div className="flex items-center justify-between">
+            <button
+              onClick={handleSaveDraft}
+              disabled={saveMutation.isPending || !content.trim()}
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 px-5 py-2.5 rounded-lg font-medium transition-colors"
+            >
+              {saveMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              Save Draft
+            </button>
+            <button
+              onClick={handleContinue}
+              disabled={!content.trim() || content.length > 3000}
+              className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors"
+            >
+              Continue to Publish
+              <ArrowRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
