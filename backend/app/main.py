@@ -13,10 +13,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.config import settings as app_settings
 from app.database import Base, engine
 from app.routers import ai, image, library, news, posts, research, search, settings
 
 logger = logging.getLogger(__name__)
+
+# fal_client reads FAL_KEY from os.environ at call time.
+# pydantic-settings loads .env into Settings fields but not os.environ,
+# so we must explicitly sync FAL_KEY across.
+if app_settings.FAL_KEY:
+    os.environ.setdefault("FAL_KEY", app_settings.FAL_KEY)
 
 # Create static/images directory before StaticFiles mount.
 # StaticFiles raises RuntimeError if the directory doesn't exist at import time.

@@ -5,6 +5,7 @@ GET  /api/image/download/{post_id} — streams saved image as a browser download
 """
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -45,10 +46,11 @@ async def generate_post_image(
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Image generation failed: {e}")
 
-    image_path = IMAGES_DIR / f"{payload.post_id}.png"
+    filename = f"{payload.post_id}_{int(time.time())}.png"
+    image_path = IMAGES_DIR / filename
     image_path.write_bytes(image_bytes)
 
-    image_url = f"/static/images/{payload.post_id}.png"
+    image_url = f"/static/images/{filename}"
     post.image_url = image_url
     db.commit()
 
@@ -65,7 +67,8 @@ async def download_post_image(
     if not post or not post.image_url:
         raise HTTPException(status_code=404, detail="Image not found for this post")
 
-    image_path = IMAGES_DIR / f"{post_id}.png"
+    # image_url is stored as e.g. "/static/images/1_1234567890.png"
+    image_path = Path(post.image_url.lstrip("/"))
     if not image_path.exists():
         raise HTTPException(status_code=404, detail="Image file not found on disk")
 

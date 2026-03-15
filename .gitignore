@@ -12,6 +12,9 @@ env/
 # Database
 *.db
 
+# Generated images
+backend/static/
+
 # Environment
 .env
 .env.local
