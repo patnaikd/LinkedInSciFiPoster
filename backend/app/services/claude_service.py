@@ -22,7 +22,7 @@ TONE_DESCRIPTIONS: dict[str, str] = {
     ),
 }
 
-MODEL = "claude-sonnet-4-5-20250514"
+MODEL = "claude-sonnet-4-6"
 
 
 def generate_post(

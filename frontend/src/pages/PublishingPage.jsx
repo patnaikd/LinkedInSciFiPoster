@@ -1,64 +1,37 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
+import { useQuery } from '@tanstack/react-query';
 import {
-  Send,
-  Linkedin,
-  CheckCircle,
+  ClipboardCopy,
+  Download,
   ExternalLink,
+  CheckCircle,
   Loader2,
+  ImageOff,
   Plus,
   History,
-  AlertCircle,
-  Eye,
+  ArrowLeft,
 } from 'lucide-react';
-import {
-  getPost,
-  getLinkedInStatus,
-  publishToLinkedIn,
-} from '../services/api';
+import { getPost } from '../services/api';
 
 export default function PublishingPage() {
   const { postId } = useParams();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const [copied, setCopied] = useState(false);
 
-  const [published, setPublished] = useState(false);
-  const [linkedinUrl, setLinkedinUrl] = useState('');
-
-  const { data: post, isLoading: postLoading } = useQuery({
+  const { data: post, isLoading } = useQuery({
     queryKey: ['post', postId],
     queryFn: () => getPost(postId),
   });
 
-  const { data: linkedinStatus, isLoading: statusLoading } = useQuery({
-    queryKey: ['linkedinStatus'],
-    queryFn: getLinkedInStatus,
-  });
-
-  const publishMutation = useMutation({
-    mutationFn: publishToLinkedIn,
-    onSuccess: (data) => {
-      setPublished(true);
-      setLinkedinUrl(data.linkedin_url || data.url || '');
-      queryClient.invalidateQueries({ queryKey: ['post', postId] });
-      toast.success('Published to LinkedIn!');
-    },
-    onError: (err) => toast.error(err.message || 'Publishing failed'),
-  });
-
-  const handleConnect = () => {
-    window.open('/api/linkedin/authorize', '_blank', 'width=600,height=700');
+  const handleCopy = async () => {
+    if (!post?.content) return;
+    await navigator.clipboard.writeText(post.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const handlePublish = () => {
-    publishMutation.mutate({ post_id: parseInt(postId) });
-  };
-
-  const isConnected = linkedinStatus?.connected || linkedinStatus?.is_connected;
-
-  if (postLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
@@ -70,137 +43,133 @@ export default function PublishingPage() {
     <div className="min-h-screen bg-slate-900 text-slate-200">
       <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-8">
-          <Send className="w-8 h-8 text-cyan-400" />
-          <h1 className="text-3xl font-bold text-white">Publish</h1>
+          <ClipboardCopy className="w-8 h-8 text-cyan-400" />
+          <h1 className="text-3xl font-bold text-white">Publish to LinkedIn</h1>
         </div>
 
-        {published ? (
-          /* Success State */
-          <div className="bg-slate-800 rounded-xl border border-green-500/30 p-8 text-center">
-            <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">Published Successfully!</h2>
-            <p className="text-slate-400 mb-6">
-              Your post has been published to LinkedIn.
-            </p>
-
-            {linkedinUrl && (
-              <a
-                href={linkedinUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold transition-colors mb-4"
-              >
-                <ExternalLink className="w-5 h-5" />
-                View on LinkedIn
-              </a>
-            )}
-
-            <div className="flex justify-center gap-4 mt-4">
-              <button
-                onClick={() => navigate('/')}
-                className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-2.5 rounded-lg font-medium transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Create Another Post
-              </button>
-              <button
-                onClick={() => navigate('/history')}
-                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-300 px-5 py-2.5 rounded-lg font-medium transition-colors"
-              >
-                <History className="w-4 h-4" />
-                View History
-              </button>
+        {/* Step 1: Copy post text */}
+        <div className="bg-slate-800 rounded-xl border border-slate-700 mb-4 overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-6 h-6 bg-cyan-600 text-white text-xs font-bold rounded-full">1</span>
+              <h2 className="text-base font-semibold text-white">Copy your post text</h2>
             </div>
+            <span className={`text-sm ${(post?.content?.length || 0) > 3000 ? 'text-red-400' : 'text-slate-500'}`}>
+              {post?.content?.length || 0} characters
+            </span>
           </div>
-        ) : (
-          <>
-            {/* LinkedIn Preview Card */}
-            <div className="bg-slate-800 rounded-xl border border-slate-700 mb-6 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-cyan-400" />
-                  <h2 className="text-lg font-semibold text-white">LinkedIn Preview</h2>
-                </div>
-                <span
-                  className={`text-sm ${
-                    (post?.content?.length || 0) > 3000 ? 'text-red-400' : 'text-slate-500'
-                  }`}
-                >
-                  {post?.content?.length || 0} characters
-                </span>
-              </div>
-
-              {/* Mock LinkedIn Post */}
-              <div className="p-6">
-                <div className="bg-white rounded-lg p-6 text-slate-900 max-h-96 overflow-y-auto">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
-                      <Linkedin className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-900">Your Name</p>
-                      <p className="text-slate-500 text-sm">Just now</p>
-                    </div>
-                  </div>
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
-                    {post?.content || 'No content yet.'}
-                  </div>
-                </div>
-              </div>
+          <div className="p-5">
+            <div className="bg-slate-900/60 border border-slate-700 rounded-lg p-4 text-slate-300 text-sm leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap mb-4">
+              {post?.content || 'No content yet.'}
             </div>
-
-            {/* Connection Status & Publish */}
-            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Linkedin className="w-5 h-5 text-blue-400" />
-                LinkedIn Connection
-              </h3>
-
-              {statusLoading ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="w-5 h-5 text-cyan-400 animate-spin" />
-                  <span className="ml-2 text-slate-400">Checking connection...</span>
-                </div>
-              ) : isConnected ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-green-400">
-                    <CheckCircle className="w-5 h-5" />
-                    <span className="font-medium">Connected to LinkedIn</span>
-                  </div>
-                  <button
-                    onClick={handlePublish}
-                    disabled={publishMutation.isPending || !post?.content}
-                    className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-6 py-3 rounded-xl font-semibold text-lg transition-colors"
-                  >
-                    {publishMutation.isPending ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <Send className="w-5 h-5" />
-                    )}
-                    {publishMutation.isPending ? 'Publishing...' : 'Publish to LinkedIn'}
-                  </button>
-                </div>
+            <button
+              onClick={handleCopy}
+              disabled={!post?.content}
+              className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-medium transition-colors"
+            >
+              {copied ? (
+                <CheckCircle className="w-4 h-4 text-green-300" />
               ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-amber-400">
-                    <AlertCircle className="w-5 h-5" />
-                    <span className="font-medium">Not connected to LinkedIn</span>
-                  </div>
-                  <p className="text-slate-400 text-sm">
-                    Connect your LinkedIn account to publish posts directly.
-                  </p>
-                  <button
-                    onClick={handleConnect}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold transition-colors"
-                  >
-                    <Linkedin className="w-5 h-5" />
-                    Connect LinkedIn
-                  </button>
-                </div>
+                <ClipboardCopy className="w-4 h-4" />
               )}
-            </div>
-          </>
-        )}
+              {copied ? 'Copied!' : 'Copy Post Text'}
+            </button>
+          </div>
+        </div>
+
+        {/* Step 2: Download image */}
+        <div className="bg-slate-800 rounded-xl border border-slate-700 mb-4 overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-700 flex items-center gap-2">
+            <span className="flex items-center justify-center w-6 h-6 bg-cyan-600 text-white text-xs font-bold rounded-full">2</span>
+            <h2 className="text-base font-semibold text-white">Download your image</h2>
+          </div>
+          <div className="p-5">
+            {post?.image_url ? (
+              <div className="flex items-center gap-5">
+                <img
+                  src={post.image_url}
+                  alt="Post image"
+                  className="w-32 h-auto rounded-lg border border-slate-700 object-cover"
+                />
+                <div>
+                  <p className="text-slate-400 text-sm mb-3">Generated in Authoring step</p>
+                  <a
+                    href={`/api/image/download/${postId}`}
+                    download="post-image.png"
+                    className="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-lg font-medium transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download Image
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 text-slate-500">
+                <ImageOff className="w-5 h-5 flex-shrink-0" />
+                <p className="text-sm">
+                  No image generated.{' '}
+                  <button
+                    onClick={() => navigate(`/author/${postId}`)}
+                    className="text-cyan-400 hover:underline"
+                  >
+                    Go back to Authoring
+                  </button>{' '}
+                  to generate one.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Step 3: Post on LinkedIn */}
+        <div className="bg-slate-800 rounded-xl border border-slate-700 mb-8 overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-700 flex items-center gap-2">
+            <span className="flex items-center justify-center w-6 h-6 bg-cyan-600 text-white text-xs font-bold rounded-full">3</span>
+            <h2 className="text-base font-semibold text-white">Post on LinkedIn</h2>
+          </div>
+          <div className="p-5">
+            <ol className="text-slate-300 text-sm leading-loose list-decimal list-inside space-y-1 mb-5">
+              <li>Open LinkedIn and click <strong className="text-white">"Start a post"</strong></li>
+              <li>Paste your copied text <span className="text-slate-500">(Ctrl+V / ⌘V)</span></li>
+              <li>Click the <strong className="text-white">photo icon</strong> and upload your downloaded image</li>
+              <li>Review and click <strong className="text-white">"Post"</strong></li>
+            </ol>
+            <a
+              href="https://www.linkedin.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open LinkedIn
+            </a>
+          </div>
+        </div>
+
+        {/* Bottom actions */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate(`/author/${postId}`)}
+            className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2.5 rounded-lg font-medium transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Authoring
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2.5 rounded-lg font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Create Another Post
+          </button>
+          <button
+            onClick={() => navigate('/history')}
+            className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2.5 rounded-lg font-medium transition-colors"
+          >
+            <History className="w-4 h-4" />
+            View History
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -30,11 +30,8 @@ export const searchNews = (keywords, page = 1) => client.get('/news/search', { p
 // AI
 export const generatePost = (data) => client.post('/ai/generate', data).then(r => r.data)
 
-// LinkedIn
-export const getLinkedInAuthUrl = () => client.get('/linkedin/authorize').then(r => r.data)
-export const getLinkedInStatus = () => client.get('/linkedin/status').then(r => r.data)
-export const publishToLinkedIn = (data) => client.post('/linkedin/publish', data).then(r => r.data)
-export const disconnectLinkedIn = () => client.delete('/linkedin/disconnect').then(r => r.data)
+// Image
+export const generateImage = (data) => client.post('/image/generate', data).then(r => r.data)
 
 // Settings
 export const getSettings = () => client.get('/settings').then(r => r.data)

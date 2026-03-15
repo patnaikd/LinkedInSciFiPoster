@@ -28,8 +28,7 @@ class PostResponse(BaseModel):
     tone: str
     status: str
     draft_number: int
-    linkedin_post_url: str | None = None
-    linkedin_post_id: str | None = None
+    image_url: str | None = None
     published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

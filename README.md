@@ -28,17 +28,13 @@ A web application that generates LinkedIn posts connecting science fiction theme
 3. Create an account
 4. Copy the API key from the dashboard
 
-### LinkedIn OAuth Credentials (Required for publishing)
+### fal.ai API Key (Required for image generation)
 
-1. Go to [LinkedIn Developer Portal](https://www.linkedin.com/developers/)
-2. Click **Create App**
-3. Fill in app details (name, LinkedIn page, logo)
-4. After creation, go to the **Auth** tab
-5. Add `http://localhost:8000/api/linkedin/callback` to **Authorized redirect URLs**
-6. Go to the **Products** tab and request access to:
-   - **Share on LinkedIn**
-   - **Sign In with LinkedIn using OpenID Connect**
-7. Copy **Client ID** and **Client Secret** from the Auth tab
+1. Go to [fal.ai](https://fal.ai/)
+2. Sign up or log in
+3. Navigate to **Keys** in the dashboard
+4. Click **Add key**
+5. Copy the generated key
 
 ## Setup
 
@@ -52,8 +48,7 @@ A web application that generates LinkedIn posts connecting science fiction theme
    ANTHROPIC_API_KEY=sk-ant-xxx
    TMDB_API_KEY=your-tmdb-key
    NEWS_API_KEY=your-newsapi-key
-   LINKEDIN_CLIENT_ID=your-client-id
-   LINKEDIN_CLIENT_SECRET=your-client-secret
+   FAL_KEY=your-fal-ai-key
    ```
 
 3. Install and run the backend:

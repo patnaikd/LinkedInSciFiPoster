@@ -15,12 +15,15 @@ import {
   FileText,
   MessageSquare,
   ExternalLink,
+  ImageIcon,
+  Download,
 } from 'lucide-react';
 import {
   getPost,
   getResearchItems,
   generatePost,
   updatePost,
+  generateImage,
 } from '../services/api';
 
 const TONE_OPTIONS = [
@@ -41,6 +44,9 @@ export default function AuthoringPage() {
   const [content, setContent] = useState('');
   const [additionalInstructions, setAdditionalInstructions] = useState('');
   const [contentLoaded, setContentLoaded] = useState(false);
+  const [imagePrompt, setImagePrompt] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [imagePromptInitialized, setImagePromptInitialized] = useState(false);
 
   const { data: post, isLoading: postLoading } = useQuery({
     queryKey: ['post', postId],
@@ -86,6 +92,19 @@ export default function AuthoringPage() {
     onError: (err) => toast.error(err.message || 'Failed to save'),
   });
 
+  const imageMutation = useMutation({
+    mutationFn: generateImage,
+    onSuccess: (data) => {
+      setImageUrl(data.image_url);
+      toast.success('Image generated!');
+    },
+    onError: (err) => toast.error(err.message || 'Image generation failed'),
+  });
+
+  const handleGenerateImage = () => {
+    imageMutation.mutate({ post_id: parseInt(postId), prompt: imagePrompt });
+  };
+
   const handleGenerate = () => {
     generateMutation.mutate({
       post_id: parseInt(postId),
@@ -119,6 +138,18 @@ export default function AuthoringPage() {
 
   const sciFiItem = post?.sci_fi_item;
   const themes = sciFiItem ? parseThemes(sciFiItem.themes) : [];
+
+  if (post && sciFiItem && !imagePromptInitialized) {
+    const themeStr = themes.length > 0 ? themes.join(', ') : 'science fiction';
+    setImagePrompt(
+      `${sciFiItem.title} — ${themeStr} — cinematic sci-fi style, dramatic lighting, photorealistic`
+    );
+    setImagePromptInitialized(true);
+  }
+  if (post && !sciFiItem && !imagePromptInitialized) {
+    setImagePrompt('cinematic sci-fi landscape, dramatic lighting, photorealistic');
+    setImagePromptInitialized(true);
+  }
 
   if (postLoading) {
     return (
@@ -299,6 +330,71 @@ export default function AuthoringPage() {
                 placeholder="Your LinkedIn post content will appear here after generation, or you can start writing..."
                 className="flex-1 min-h-[400px] bg-transparent px-4 py-4 text-slate-200 placeholder-slate-500 focus:outline-none resize-none text-base leading-relaxed"
               />
+            </div>
+          </div>
+
+          {/* Image Generation Section */}
+          <div className="bg-slate-800 rounded-xl border border-cyan-500/30 mb-6">
+            <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-cyan-400" />
+                <span className="text-slate-300 text-sm font-medium">Post Image</span>
+              </div>
+              <span className="text-xs text-cyan-500 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
+                fal.ai
+              </span>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-xs text-slate-500 uppercase tracking-wide mb-1.5 block">
+                  Image prompt
+                </label>
+                <textarea
+                  value={imagePrompt}
+                  onChange={(e) => setImagePrompt(e.target.value)}
+                  placeholder="Describe the image for your post..."
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-sm leading-relaxed resize-none"
+                  rows={3}
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleGenerateImage}
+                  disabled={imageMutation.isPending || !imagePrompt.trim()}
+                  className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+                >
+                  {imageMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                  {imageMutation.isPending ? 'Generating…' : 'Generate Image'}
+                </button>
+                {imageMutation.isPending && (
+                  <span className="text-slate-500 text-xs">~10–20 seconds</span>
+                )}
+              </div>
+
+              {imageUrl && (
+                <div className="flex items-start gap-4 pt-2">
+                  <img
+                    src={imageUrl}
+                    alt="Generated post image"
+                    className="w-40 h-auto rounded-lg border border-slate-700 object-cover"
+                  />
+                  <div className="flex flex-col gap-2">
+                    <span className="text-slate-400 text-xs">Ready to download</span>
+                    <a
+                      href={`/api/image/download/${postId}`}
+                      download="post-image.png"
+                      className="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download Image
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

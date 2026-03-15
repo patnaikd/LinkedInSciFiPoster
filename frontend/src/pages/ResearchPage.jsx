@@ -101,7 +101,7 @@ export default function ResearchPage() {
   const handleAddNewsItem = (article) => {
     addMutation.mutate({
       post_id: parseInt(postId),
-      source_type: 'news',
+      source_type: 'news_api',
       title: article.title,
       url: article.url,
       snippet: article.description || article.snippet || '',
@@ -117,7 +117,7 @@ export default function ResearchPage() {
     }
     addMutation.mutate({
       post_id: parseInt(postId),
-      source_type: 'url',
+      source_type: 'manual_url',
       title: urlForm.title,
       url: urlForm.url,
       snippet: urlForm.notes,
@@ -134,7 +134,7 @@ export default function ResearchPage() {
     }
     addMutation.mutate({
       post_id: parseInt(postId),
-      source_type: 'text',
+      source_type: 'manual_text',
       title: textForm.title,
       url: '',
       snippet: textForm.snippet,
@@ -271,9 +271,9 @@ export default function ResearchPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          {item.source_type === 'news' && <Newspaper className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />}
-                          {item.source_type === 'url' && <Globe className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />}
-                          {item.source_type === 'text' && <Type className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />}
+                          {item.source_type === 'news_api' && <Newspaper className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />}
+                          {item.source_type === 'manual_url' && <Globe className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />}
+                          {item.source_type === 'manual_text' && <Type className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />}
                           <h4 className="text-white text-sm font-medium truncate">{item.title}</h4>
                         </div>
                         {item.snippet && (

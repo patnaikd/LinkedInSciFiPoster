@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
+
+logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.models.post import Post
@@ -79,6 +82,7 @@ def generate_post_endpoint(
             previous_draft=previous_draft,
         )
     except Exception as e:
+        logger.error("AI generation failed for post %s: %s", payload.post_id, e, exc_info=True)
         raise HTTPException(status_code=502, detail=f"AI generation failed: {e}")
 
     # Update the post with new content
