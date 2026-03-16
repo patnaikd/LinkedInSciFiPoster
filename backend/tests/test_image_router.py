@@ -1,4 +1,3 @@
-import os
 import pytest
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
@@ -7,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import Base, get_db
 from app.models.post import Post
+from app.models.post_image import PostImage
 
 
 @pytest.fixture
@@ -27,11 +27,6 @@ def test_client(tmp_path):
         finally:
             db.close()
 
-    # Create a static/images dir in tmp_path
-    images_dir = tmp_path / "static" / "images"
-    images_dir.mkdir(parents=True)
-
-    # Import app after patching static dir
     from app.main import app
     app.dependency_overrides[get_db] = override_db
 
@@ -45,32 +40,34 @@ def test_client(tmp_path):
     db.close()
 
     client = TestClient(app, raise_server_exceptions=True)
-    return client, post_id, str(images_dir), engine
+    return client, post_id, engine
 
 
-def test_generate_image_success(test_client, tmp_path, monkeypatch):
-    client, post_id, images_dir, engine = test_client
+def test_generate_image_success(test_client):
+    client, post_id, engine = test_client
     fake_bytes = b"\x89PNG fake image data"
-
-    monkeypatch.chdir(tmp_path)  # make static/images resolve correctly
-    (tmp_path / "static" / "images").mkdir(parents=True, exist_ok=True)
 
     with patch("app.routers.image.generate_image", new=AsyncMock(return_value=fake_bytes)):
         resp = client.post("/api/image/generate", json={"post_id": post_id, "prompt": "sci-fi sky"})
 
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     data = resp.json()
-    assert data["image_url"] == f"/static/images/{post_id}.png"
+    assert data["post_id"] == post_id
+    assert data["prompt"] == "sci-fi sky"
+    assert data["is_selected"] is False
+    assert "id" in data
+    assert "created_at" in data
+    # Verify image stored in DB
+    TestSession = sessionmaker(bind=engine)
+    db = TestSession()
+    image = db.query(PostImage).filter(PostImage.post_id == post_id).first()
+    assert image is not None
+    assert image.image_data == fake_bytes
+    db.close()
 
-    # Verify file was written
-    saved = (tmp_path / "static" / "images" / f"{post_id}.png").read_bytes()
-    assert saved == fake_bytes
 
-
-def test_generate_image_post_not_found(test_client, tmp_path, monkeypatch):
-    client, post_id, images_dir, engine = test_client
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "static" / "images").mkdir(parents=True, exist_ok=True)
+def test_generate_image_post_not_found(test_client):
+    client, post_id, engine = test_client
 
     with patch("app.routers.image.generate_image", new=AsyncMock(return_value=b"data")):
         resp = client.post("/api/image/generate", json={"post_id": 9999, "prompt": "x"})
@@ -78,33 +75,100 @@ def test_generate_image_post_not_found(test_client, tmp_path, monkeypatch):
     assert resp.status_code == 404
 
 
-def test_download_image_success(test_client, tmp_path, monkeypatch):
-    client, post_id, images_dir, engine = test_client
-    monkeypatch.chdir(tmp_path)
-    img_path = tmp_path / "static" / "images" / f"{post_id}.png"
-    img_path.parent.mkdir(parents=True, exist_ok=True)
-    img_path.write_bytes(b"\x89PNG data")
+def test_download_image_success(test_client):
+    client, post_id, engine = test_client
+    fake_bytes = b"\x89PNG data"
 
-    # Set image_url on the post so the download endpoint finds it
-    from sqlalchemy.orm import sessionmaker as sm
-    Session = sm(bind=engine)
-    db = Session()
-    from app.models.post import Post as PostModel
-    post = db.query(PostModel).filter(PostModel.id == post_id).first()
-    post.image_url = f"/static/images/{post_id}.png"
+    # Insert a selected PostImage directly into the DB
+    TestSession = sessionmaker(bind=engine)
+    db = TestSession()
+    image = PostImage(post_id=post_id, image_data=fake_bytes, prompt="test", is_selected=True)
+    db.add(image)
     db.commit()
     db.close()
 
     resp = client.get(f"/api/image/download/{post_id}")
     assert resp.status_code == 200
     assert resp.headers["content-disposition"] == 'attachment; filename="post-image.png"'
-    assert resp.content == b"\x89PNG data"
+    assert resp.content == fake_bytes
 
 
-def test_download_image_not_found(test_client, tmp_path, monkeypatch):
-    client, post_id, images_dir, engine = test_client
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "static" / "images").mkdir(parents=True, exist_ok=True)
+def test_download_image_not_found(test_client):
+    client, post_id, engine = test_client
 
-    resp = client.get(f"/api/image/download/9999")
+    # No PostImage exists for this post — should return 404
+    resp = client.get(f"/api/image/download/{post_id}")
     assert resp.status_code == 404
+
+
+def test_get_image_success(test_client):
+    client, post_id, engine = test_client
+    fake_bytes = b"\x89PNG serve test"
+
+    TestSession = sessionmaker(bind=engine)
+    db = TestSession()
+    image = PostImage(post_id=post_id, image_data=fake_bytes, prompt="test", is_selected=False)
+    db.add(image)
+    db.commit()
+    db.refresh(image)
+    image_id = image.id
+    db.close()
+
+    resp = client.get(f"/api/image/{image_id}")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "image/png"
+    assert resp.content == fake_bytes
+
+
+def test_get_image_not_found(test_client):
+    client, post_id, engine = test_client
+    resp = client.get("/api/image/99999")
+    assert resp.status_code == 404
+
+
+def test_select_image(test_client):
+    client, post_id, engine = test_client
+    fake_bytes = b"\x89PNG"
+
+    TestSession = sessionmaker(bind=engine)
+    db = TestSession()
+    img1 = PostImage(post_id=post_id, image_data=fake_bytes, is_selected=False)
+    img2 = PostImage(post_id=post_id, image_data=fake_bytes, is_selected=False)
+    db.add_all([img1, img2])
+    db.commit()
+    db.refresh(img1)
+    db.refresh(img2)
+    img1_id, img2_id = img1.id, img2.id
+    db.close()
+
+    # Select img1
+    resp = client.put(f"/api/image/{img1_id}/select")
+    assert resp.status_code == 200
+    assert resp.json()["is_selected"] is True
+
+    # Verify img2 is not selected
+    db = TestSession()
+    img2_db = db.query(PostImage).filter(PostImage.id == img2_id).first()
+    assert img2_db.is_selected is False
+    db.close()
+
+
+def test_delete_image(test_client):
+    client, post_id, engine = test_client
+
+    TestSession = sessionmaker(bind=engine)
+    db = TestSession()
+    image = PostImage(post_id=post_id, image_data=b"\x89PNG", is_selected=False)
+    db.add(image)
+    db.commit()
+    db.refresh(image)
+    image_id = image.id
+    db.close()
+
+    resp = client.delete(f"/api/image/{image_id}")
+    assert resp.status_code == 204
+
+    # Verify deleted
+    db = TestSession()
+    assert db.query(PostImage).filter(PostImage.id == image_id).first() is None
+    db.close()
