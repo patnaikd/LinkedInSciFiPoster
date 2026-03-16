@@ -24,6 +24,8 @@ export default function PublishingPage() {
     queryFn: () => getPost(postId),
   });
 
+  const selectedImg = post?.images?.find(img => img.is_selected);
+
   const handleCopy = async () => {
     if (!post?.content) return;
     await navigator.clipboard.writeText(post.content);
@@ -84,10 +86,10 @@ export default function PublishingPage() {
             <h2 className="text-base font-semibold text-white">Download your image</h2>
           </div>
           <div className="p-5">
-            {post?.image_url ? (
+            {selectedImg ? (
               <div className="flex items-center gap-5">
                 <img
-                  src={post.image_url}
+                  src={`/api/image/${selectedImg.id}`}
                   alt="Post image"
                   className="w-32 h-auto rounded-lg border border-slate-700 object-cover"
                 />
@@ -107,14 +109,14 @@ export default function PublishingPage() {
               <div className="flex items-center gap-3 text-slate-500">
                 <ImageOff className="w-5 h-5 flex-shrink-0" />
                 <p className="text-sm">
-                  No image generated.{' '}
+                  No image selected.{' '}
                   <button
                     onClick={() => navigate(`/author/${postId}`)}
                     className="text-cyan-400 hover:underline"
                   >
                     Go back to Authoring
                   </button>{' '}
-                  to generate one.
+                  to generate and select one.
                 </p>
               </div>
             )}
