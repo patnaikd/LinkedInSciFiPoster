@@ -32,3 +32,6 @@ frontend/dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Superpowers brainstorm runtime (docs/superpowers/ is kept)
+.superpowers/brainstorm/
