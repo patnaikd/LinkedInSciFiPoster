@@ -26,3 +26,9 @@ class Post(Base):
     research_items = relationship(
         "ResearchItem", back_populates="post", cascade="all, delete-orphan"
     )
+    images = relationship(
+        "PostImage",
+        back_populates="post",
+        cascade="all, delete-orphan",
+        order_by="PostImage.created_at",
+    )
