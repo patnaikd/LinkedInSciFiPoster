@@ -10,7 +10,7 @@ class PostImage(Base):
     __tablename__ = "post_images"
 
     id = Column(Integer, primary_key=True, index=True)
-    post_id = Column(Integer, ForeignKey("posts.id"), nullable=False)
+    post_id = Column(Integer, ForeignKey("posts.id"), nullable=False, index=True)
     image_data = Column(LargeBinary, nullable=False)
     prompt = Column(Text)
     is_selected = Column(Boolean, default=False, nullable=False)
