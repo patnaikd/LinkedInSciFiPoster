@@ -25,26 +25,11 @@ logger = logging.getLogger(__name__)
 if app_settings.FAL_KEY:
     os.environ.setdefault("FAL_KEY", app_settings.FAL_KEY)
 
-# Create static/images directory before StaticFiles mount.
-# StaticFiles raises RuntimeError if the directory doesn't exist at import time.
-os.makedirs("static/images", exist_ok=True)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Create tables for new schemas
     Base.metadata.create_all(bind=engine)
-
-    # Add image_url column if it doesn't exist yet (SQLite ALTER TABLE migration).
-    # Note: linkedin_post_url and linkedin_post_id remain as phantom columns in the
-    # SQLite file (SQLite pre-3.35 cannot DROP COLUMN) but are no longer in the model.
-    from sqlalchemy import text
-    with engine.connect() as conn:
-        try:
-            conn.execute(text("ALTER TABLE posts ADD COLUMN image_url TEXT"))
-            conn.commit()
-        except Exception:
-            pass  # column already exists
 
     yield
 
@@ -70,9 +55,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Serve generated images at /static/images/<filename>
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(library.router, prefix="/api/library", tags=["library"])
