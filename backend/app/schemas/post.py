@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from app.schemas.library import SciFiItemResponse
+from app.schemas.post_image import PostImageResponse
 from app.schemas.research import ResearchItemResponse
 
 
@@ -28,11 +29,11 @@ class PostResponse(BaseModel):
     tone: str
     status: str
     draft_number: int
-    image_url: str | None = None
     published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     sci_fi_item: SciFiItemResponse | None = None
     research_items: list[ResearchItemResponse] = []
+    images: list[PostImageResponse] = []
 
     model_config = ConfigDict(from_attributes=True)

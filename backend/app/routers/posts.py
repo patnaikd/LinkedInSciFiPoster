@@ -11,6 +11,7 @@ from app.models.post import Post
 from app.models.sci_fi_item import SciFiItem
 from app.schemas.library import SciFiItemResponse
 from app.schemas.post import PostCreate, PostResponse, PostUpdate
+from app.schemas.post_image import PostImageResponse
 from app.schemas.research import ResearchItemResponse
 
 router = APIRouter()
@@ -49,6 +50,7 @@ def _post_to_response(post: Post) -> PostResponse:
     research_items = [
         ResearchItemResponse.model_validate(ri) for ri in post.research_items
     ]
+    images = [PostImageResponse.model_validate(img) for img in post.images]
     return PostResponse(
         id=post.id,
         sci_fi_item_id=post.sci_fi_item_id,
@@ -57,12 +59,12 @@ def _post_to_response(post: Post) -> PostResponse:
         tone=post.tone,
         status=post.status,
         draft_number=post.draft_number,
-        image_url=post.image_url,
         published_at=post.published_at,
         created_at=post.created_at,
         updated_at=post.updated_at,
         sci_fi_item=_sci_fi_item_to_response(post.sci_fi_item),
         research_items=research_items,
+        images=images,
     )
 
 
@@ -76,7 +78,7 @@ def list_posts(
     """List all posts with optional status filtering."""
     query = (
         db.query(Post)
-        .options(joinedload(Post.sci_fi_item), joinedload(Post.research_items))
+        .options(joinedload(Post.sci_fi_item), joinedload(Post.research_items), joinedload(Post.images))
     )
     if status:
         query = query.filter(Post.status == status)
@@ -93,7 +95,7 @@ def get_post(
     """Get a single post by ID with related data."""
     post = (
         db.query(Post)
-        .options(joinedload(Post.sci_fi_item), joinedload(Post.research_items))
+        .options(joinedload(Post.sci_fi_item), joinedload(Post.research_items), joinedload(Post.images))
         .filter(Post.id == post_id)
         .first()
     )
@@ -132,7 +134,7 @@ def create_post(
     # Re-query with eager loading
     post = (
         db.query(Post)
-        .options(joinedload(Post.sci_fi_item), joinedload(Post.research_items))
+        .options(joinedload(Post.sci_fi_item), joinedload(Post.research_items), joinedload(Post.images))
         .filter(Post.id == post.id)
         .first()
     )
@@ -161,7 +163,7 @@ def update_post(
     # Re-query with eager loading
     post = (
         db.query(Post)
-        .options(joinedload(Post.sci_fi_item), joinedload(Post.research_items))
+        .options(joinedload(Post.sci_fi_item), joinedload(Post.research_items), joinedload(Post.images))
         .filter(Post.id == post.id)
         .first()
     )
