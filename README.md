@@ -70,3 +70,37 @@ A web application that generates LinkedIn posts connecting science fiction theme
 5. Open the app at `http://localhost:5173`
    - Backend API: `http://localhost:8000`
    - API docs (Swagger): `http://localhost:8000/docs`
+
+## Deploying to Render
+
+The project includes a `render.yaml` for one-click deployment to [Render](https://render.com). The build process compiles the frontend into static files and serves them from the FastAPI backend — a single service handles everything.
+
+### Steps
+
+1. **Push your code to GitHub.**
+
+2. **Connect to Render**
+   - Go to [render.com](https://render.com) and sign in
+   - Click **New** → **Blueprint**
+   - Connect your GitHub repository
+   - Render will auto-detect `render.yaml` and configure the service
+
+3. **Set secret environment variables**
+   During setup (or via the Render dashboard under Environment), add:
+   - `ANTHROPIC_API_KEY`
+   - `TMDB_API_KEY`
+   - `NEWS_API_KEY`
+   - `FAL_KEY`
+   - `ALLOWED_ORIGINS` — set to your Render app URL once deployed (e.g. `https://linkedin-scifi-poster.onrender.com`)
+
+4. **Deploy** — click **Apply** and Render will build and start the service automatically.
+
+### SQLite persistence warning
+
+The default config uses SQLite (`sqlite:///./scifi_poster.db`). On Render's free plan, the filesystem is ephemeral — **the database will be wiped on every deploy or restart**.
+
+To persist data, add a [Render Disk](https://render.com/docs/disks) ($1/mo) and update `DATABASE_URL` in the Render dashboard to point to it:
+
+```
+DATABASE_URL=sqlite:////data/scifi_poster.db
+```

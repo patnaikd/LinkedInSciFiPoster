@@ -33,5 +33,6 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
-# Superpowers brainstorm runtime (docs/superpowers/ is kept)
-.superpowers/brainstorm/
+# Superpowers and Claude local config
+.superpowers/
+.claude/
