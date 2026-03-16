@@ -32,6 +32,7 @@ export const generatePost = (data) => client.post('/ai/generate', data).then(r =
 
 // Image
 export const generateImage = (data) => client.post('/image/generate', data).then(r => r.data)
+export const suggestImagePrompt = (postId) => client.post(`/image/suggest-prompt?post_id=${postId}`).then(r => r.data)
 
 // Settings
 export const getSettings = () => client.get('/settings').then(r => r.data)

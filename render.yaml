@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: linkedin-scifi-poster
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: >-
+      cd ../frontend && npm ci && npm run build &&
+      cd ../backend && pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+      - key: DATABASE_URL
+        value: sqlite:///./scifi_poster.db
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: TMDB_API_KEY
+        sync: false
+      - key: NEWS_API_KEY
+        sync: false
+      - key: FAL_KEY
+        sync: false

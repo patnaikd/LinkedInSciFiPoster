@@ -134,3 +134,49 @@ def generate_post(
 
     generated_content = message.content[0].text
     return generated_content, full_prompt
+
+
+def suggest_image_prompt(
+    sci_fi_item: dict,
+    research_items: list[dict],
+) -> str:
+    """Generate a fal.ai image prompt based on sci-fi item and research articles.
+
+    Returns:
+        A concise image prompt string suitable for fal.ai/flux.
+    """
+    sci_fi_lines = [
+        f"Sci-fi work: {sci_fi_item.get('title', 'N/A')}",
+        f"Themes: {', '.join(sci_fi_item.get('themes', [])) or 'N/A'}",
+        f"Description: {sci_fi_item.get('description', 'N/A')}",
+    ]
+
+    article_lines = []
+    for item in research_items:
+        article_lines.append(f"- {item.get('title', '')}: {item.get('snippet', '')}")
+
+    articles_text = "\n".join(article_lines) if article_lines else "No articles provided."
+
+    user_prompt = (
+        "You are generating an image prompt for a LinkedIn post image.\n\n"
+        f"{chr(10).join(sci_fi_lines)}\n\n"
+        f"Related articles:\n{articles_text}\n\n"
+        "Write a single concise image generation prompt (max 2 sentences) that visually "
+        "captures the connection between the sci-fi work and the article themes. "
+        "Style: cinematic, dramatic lighting, photorealistic. "
+        "Output only the prompt text, nothing else."
+    )
+
+    try:
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        message = client.messages.create(
+            model=MODEL,
+            max_tokens=200,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+    except anthropic.AuthenticationError as exc:
+        raise RuntimeError("Anthropic API authentication failed.") from exc
+    except anthropic.APIError as exc:
+        raise RuntimeError(f"Anthropic API error: {exc}") from exc
+
+    return message.content[0].text.strip()

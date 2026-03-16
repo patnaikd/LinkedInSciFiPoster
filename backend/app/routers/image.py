@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.post import Post
+from app.services.claude_service import suggest_image_prompt
 from app.services.fal_service import generate_image
 
 router = APIRouter()
@@ -29,6 +30,54 @@ class GenerateRequest(BaseModel):
 
 class GenerateResponse(BaseModel):
     image_url: str
+
+
+class SuggestPromptResponse(BaseModel):
+    prompt: str
+
+
+@router.post("/suggest-prompt", response_model=SuggestPromptResponse)
+async def suggest_post_image_prompt(
+    post_id: int,
+    db: Session = Depends(get_db),
+) -> SuggestPromptResponse:
+    """Use Claude to suggest an image prompt based on the post's sci-fi item and research."""
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    sci_fi_item = post.sci_fi_item
+    if not sci_fi_item:
+        raise HTTPException(status_code=400, detail="Post has no linked sci-fi item")
+
+    import json
+
+    themes = sci_fi_item.themes
+    if isinstance(themes, str):
+        try:
+            themes = json.loads(themes)
+        except Exception:
+            themes = []
+
+    sci_fi_dict = {
+        "title": sci_fi_item.title,
+        "author_or_director": sci_fi_item.author_or_director,
+        "year": sci_fi_item.year,
+        "description": sci_fi_item.description,
+        "themes": themes,
+    }
+
+    research_list = [
+        {"title": r.title, "url": r.url, "snippet": r.snippet}
+        for r in post.research_items
+    ]
+
+    try:
+        prompt = suggest_image_prompt(sci_fi_dict, research_list)
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    return SuggestPromptResponse(prompt=prompt)
 
 
 @router.post("/generate", response_model=GenerateResponse)

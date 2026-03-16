@@ -24,6 +24,7 @@ import {
   generatePost,
   updatePost,
   generateImage,
+  suggestImagePrompt,
 } from '../services/api';
 
 const TONE_OPTIONS = [
@@ -99,6 +100,15 @@ export default function AuthoringPage() {
       toast.success('Image generated!');
     },
     onError: (err) => toast.error(err.message || 'Image generation failed'),
+  });
+
+  const suggestPromptMutation = useMutation({
+    mutationFn: () => suggestImagePrompt(postId),
+    onSuccess: (data) => {
+      setImagePrompt(data.prompt);
+      toast.success('Prompt suggested!');
+    },
+    onError: (err) => toast.error(err.message || 'Failed to suggest prompt'),
   });
 
   const handleGenerateImage = () => {
@@ -346,9 +356,24 @@ export default function AuthoringPage() {
             </div>
             <div className="p-4 space-y-3">
               <div>
-                <label className="text-xs text-slate-500 uppercase tracking-wide mb-1.5 block">
-                  Image prompt
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs text-slate-500 uppercase tracking-wide">
+                    Image prompt
+                  </label>
+                  <button
+                    onClick={() => suggestPromptMutation.mutate()}
+                    disabled={suggestPromptMutation.isPending || !sciFiItem}
+                    className="flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 disabled:opacity-40 transition-colors"
+                    title={!sciFiItem ? 'Requires a linked sci-fi item' : 'Suggest prompt from articles'}
+                  >
+                    {suggestPromptMutation.isPending ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3 h-3" />
+                    )}
+                    {suggestPromptMutation.isPending ? 'Suggesting…' : 'Suggest from articles'}
+                  </button>
+                </div>
                 <textarea
                   value={imagePrompt}
                   onChange={(e) => setImagePrompt(e.target.value)}
