@@ -126,6 +126,7 @@ export default function AuthoringPage() {
     mutationFn: (imageId) => deleteImage(imageId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['post', postId] });
+      toast.success('Image deleted');
     },
     onError: (err) => toast.error(err.message || 'Failed to delete image'),
   });
@@ -145,7 +146,8 @@ export default function AuthoringPage() {
   // Initialise image prompt when sci-fi item first loads
   useEffect(() => {
     if (!sciFiItem) return;
-    const themeStr = themes.length > 0 ? themes.join(', ') : 'science fiction';
+    const parsed = parseThemes(sciFiItem.themes);
+    const themeStr = parsed.length > 0 ? parsed.join(', ') : 'science fiction';
     setImagePrompt(
       `${sciFiItem.title} — ${themeStr} — cinematic sci-fi style, dramatic lighting, photorealistic`
     );
@@ -158,6 +160,7 @@ export default function AuthoringPage() {
   }, [post?.images?.length]);
 
   const images = post?.images ?? [];
+  const safeIndex = images.length === 0 ? 0 : Math.min(focusedIndex, images.length - 1);
 
   if (postLoading) {
     return (
@@ -437,15 +440,15 @@ export default function AuthoringPage() {
                     </button>
                     <div className="flex-1 relative">
                       <img
-                        src={`/api/image/${images[focusedIndex].id}`}
-                        alt={`Generated image ${focusedIndex + 1}`}
+                        src={`/api/image/${images[safeIndex].id}`}
+                        alt={`Generated image ${safeIndex + 1}`}
                         className={`w-full h-48 object-cover rounded-lg border-2 transition-all ${
-                          images[focusedIndex].is_selected
+                          images[safeIndex].is_selected
                             ? 'border-cyan-400'
                             : 'border-slate-700'
                         }`}
                       />
-                      {images[focusedIndex].is_selected && (
+                      {images[safeIndex].is_selected && (
                         <div className="absolute top-2 left-2 flex items-center gap-1 bg-cyan-500 text-white text-xs px-2 py-0.5 rounded-full">
                           <Check className="w-3 h-3" />
                           Selected
@@ -478,14 +481,14 @@ export default function AuthoringPage() {
 
                   {/* Action bar */}
                   <div className="flex items-center gap-3">
-                    {images[focusedIndex].is_selected ? (
+                    {images[safeIndex].is_selected ? (
                       <span className="flex items-center gap-1.5 text-cyan-400 text-sm font-medium">
                         <Check className="w-4 h-4" />
                         Selected for publishing
                       </span>
                     ) : (
                       <button
-                        onClick={() => selectMutation.mutate(images[focusedIndex].id)}
+                        onClick={() => selectMutation.mutate(images[safeIndex].id)}
                         disabled={selectMutation.isPending}
                         className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
                       >
@@ -498,7 +501,7 @@ export default function AuthoringPage() {
                       </button>
                     )}
                     <button
-                      onClick={() => deleteMutation.mutate(images[focusedIndex].id)}
+                      onClick={() => deleteMutation.mutate(images[safeIndex].id)}
                       disabled={deleteMutation.isPending}
                       className="flex items-center gap-1.5 bg-red-900/50 hover:bg-red-800/50 disabled:opacity-50 text-red-400 hover:text-red-300 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-red-800/50"
                     >
@@ -510,7 +513,7 @@ export default function AuthoringPage() {
                       Delete
                     </button>
                     <span className="text-slate-600 text-xs ml-auto">
-                      {focusedIndex + 1} / {images.length}
+                      {safeIndex + 1} / {images.length}
                     </span>
                   </div>
 
