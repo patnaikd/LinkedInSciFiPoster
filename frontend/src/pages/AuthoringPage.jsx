@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -16,7 +16,8 @@ import {
   MessageSquare,
   ExternalLink,
   ImageIcon,
-  Download,
+  Trash2,
+  Check,
 } from 'lucide-react';
 import {
   getPost,
@@ -25,6 +26,8 @@ import {
   updatePost,
   generateImage,
   suggestImagePrompt,
+  selectImage,
+  deleteImage,
 } from '../services/api';
 
 const TONE_OPTIONS = [
@@ -46,8 +49,7 @@ export default function AuthoringPage() {
   const [additionalInstructions, setAdditionalInstructions] = useState('');
   const [contentLoaded, setContentLoaded] = useState(false);
   const [imagePrompt, setImagePrompt] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [imagePromptInitialized, setImagePromptInitialized] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(0);
 
   const { data: post, isLoading: postLoading } = useQuery({
     queryKey: ['post', postId],
@@ -95,8 +97,8 @@ export default function AuthoringPage() {
 
   const imageMutation = useMutation({
     mutationFn: generateImage,
-    onSuccess: (data) => {
-      setImageUrl(data.image_url);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['post', postId] });
       toast.success('Image generated!');
     },
     onError: (err) => toast.error(err.message || 'Image generation failed'),
@@ -111,9 +113,59 @@ export default function AuthoringPage() {
     onError: (err) => toast.error(err.message || 'Failed to suggest prompt'),
   });
 
-  const handleGenerateImage = () => {
-    imageMutation.mutate({ post_id: parseInt(postId), prompt: imagePrompt });
+  const selectMutation = useMutation({
+    mutationFn: (imageId) => selectImage(imageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['post', postId] });
+      toast.success('Image selected for publishing');
+    },
+    onError: (err) => toast.error(err.message || 'Failed to select image'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (imageId) => deleteImage(imageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['post', postId] });
+    },
+    onError: (err) => toast.error(err.message || 'Failed to delete image'),
+  });
+
+  const parseThemes = (themes) => {
+    if (Array.isArray(themes)) return themes;
+    try {
+      return JSON.parse(themes);
+    } catch {
+      return [];
+    }
   };
+
+  const sciFiItem = post?.sci_fi_item;
+  const themes = sciFiItem ? parseThemes(sciFiItem.themes) : [];
+
+  // Initialise image prompt when sci-fi item first loads
+  useEffect(() => {
+    if (!sciFiItem) return;
+    const themeStr = themes.length > 0 ? themes.join(', ') : 'science fiction';
+    setImagePrompt(
+      `${sciFiItem.title} — ${themeStr} — cinematic sci-fi style, dramatic lighting, photorealistic`
+    );
+  }, [sciFiItem?.id]);
+
+  // Clamp focusedIndex when images array changes (generate adds, delete removes)
+  useEffect(() => {
+    const len = post?.images?.length ?? 0;
+    setFocusedIndex(prev => (len === 0 ? 0 : Math.min(prev, len - 1)));
+  }, [post?.images?.length]);
+
+  const images = post?.images ?? [];
+
+  if (postLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+      </div>
+    );
+  }
 
   const handleGenerate = () => {
     generateMutation.mutate({
@@ -136,38 +188,6 @@ export default function AuthoringPage() {
       { onSuccess: () => navigate(`/publish/${postId}`) }
     );
   };
-
-  const parseThemes = (themes) => {
-    if (Array.isArray(themes)) return themes;
-    try {
-      return JSON.parse(themes);
-    } catch {
-      return [];
-    }
-  };
-
-  const sciFiItem = post?.sci_fi_item;
-  const themes = sciFiItem ? parseThemes(sciFiItem.themes) : [];
-
-  if (post && sciFiItem && !imagePromptInitialized) {
-    const themeStr = themes.length > 0 ? themes.join(', ') : 'science fiction';
-    setImagePrompt(
-      `${sciFiItem.title} — ${themeStr} — cinematic sci-fi style, dramatic lighting, photorealistic`
-    );
-    setImagePromptInitialized(true);
-  }
-  if (post && !sciFiItem && !imagePromptInitialized) {
-    setImagePrompt('cinematic sci-fi landscape, dramatic lighting, photorealistic');
-    setImagePromptInitialized(true);
-  }
-
-  if (postLoading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 flex">
@@ -355,6 +375,7 @@ export default function AuthoringPage() {
               </span>
             </div>
             <div className="p-4 space-y-3">
+              {/* Prompt input */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs text-slate-500 uppercase tracking-wide">
@@ -382,9 +403,11 @@ export default function AuthoringPage() {
                   rows={3}
                 />
               </div>
+
+              {/* Generate button */}
               <div className="flex items-center gap-3">
                 <button
-                  onClick={handleGenerateImage}
+                  onClick={() => imageMutation.mutate({ post_id: parseInt(postId), prompt: imagePrompt })}
                   disabled={imageMutation.isPending || !imagePrompt.trim()}
                   className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
                 >
@@ -400,25 +423,110 @@ export default function AuthoringPage() {
                 )}
               </div>
 
-              {imageUrl && (
-                <div className="flex items-start gap-4 pt-2">
-                  <img
-                    src={imageUrl}
-                    alt="Generated post image"
-                    className="w-40 h-auto rounded-lg border border-slate-700 object-cover"
-                  />
-                  <div className="flex flex-col gap-2">
-                    <span className="text-slate-400 text-xs">Ready to download</span>
+              {/* Carousel */}
+              {images.length > 0 ? (
+                <div className="pt-2 space-y-3">
+                  {/* Image display with prev/next arrows */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setFocusedIndex(prev => Math.max(0, prev - 1))}
+                      disabled={focusedIndex === 0}
+                      className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-300 transition-colors"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <div className="flex-1 relative">
+                      <img
+                        src={`/api/image/${images[focusedIndex].id}`}
+                        alt={`Generated image ${focusedIndex + 1}`}
+                        className={`w-full h-48 object-cover rounded-lg border-2 transition-all ${
+                          images[focusedIndex].is_selected
+                            ? 'border-cyan-400'
+                            : 'border-slate-700'
+                        }`}
+                      />
+                      {images[focusedIndex].is_selected && (
+                        <div className="absolute top-2 left-2 flex items-center gap-1 bg-cyan-500 text-white text-xs px-2 py-0.5 rounded-full">
+                          <Check className="w-3 h-3" />
+                          Selected
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setFocusedIndex(prev => Math.min(images.length - 1, prev + 1))}
+                      disabled={focusedIndex === images.length - 1}
+                      className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-300 transition-colors"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Dot indicators */}
+                  {images.length > 1 && (
+                    <div className="flex justify-center gap-1.5">
+                      {images.map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setFocusedIndex(i)}
+                          className={`w-2 h-2 rounded-full transition-colors ${
+                            i === focusedIndex ? 'bg-cyan-400' : 'bg-slate-600 hover:bg-slate-500'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Action bar */}
+                  <div className="flex items-center gap-3">
+                    {images[focusedIndex].is_selected ? (
+                      <span className="flex items-center gap-1.5 text-cyan-400 text-sm font-medium">
+                        <Check className="w-4 h-4" />
+                        Selected for publishing
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => selectMutation.mutate(images[focusedIndex].id)}
+                        disabled={selectMutation.isPending}
+                        className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                      >
+                        {selectMutation.isPending ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Check className="w-3 h-3" />
+                        )}
+                        Use this image
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deleteMutation.mutate(images[focusedIndex].id)}
+                      disabled={deleteMutation.isPending}
+                      className="flex items-center gap-1.5 bg-red-900/50 hover:bg-red-800/50 disabled:opacity-50 text-red-400 hover:text-red-300 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-red-800/50"
+                    >
+                      {deleteMutation.isPending ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3 h-3" />
+                      )}
+                      Delete
+                    </button>
+                    <span className="text-slate-600 text-xs ml-auto">
+                      {focusedIndex + 1} / {images.length}
+                    </span>
+                  </div>
+
+                  {/* Download link — only when an image is selected */}
+                  {images.some(img => img.is_selected) && (
                     <a
                       href={`/api/image/download/${postId}`}
                       download="post-image.png"
-                      className="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+                      className="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 text-sm transition-colors"
                     >
-                      <Download className="w-4 h-4" />
-                      Download Image
+                      ↓ Download selected image
                     </a>
-                  </div>
+                  )}
                 </div>
+              ) : (
+                <p className="text-slate-600 text-sm pt-1">No images generated yet.</p>
               )}
             </div>
           </div>
